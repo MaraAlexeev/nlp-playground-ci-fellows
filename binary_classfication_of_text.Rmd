@@ -1,0 +1,173 @@
+---
+title: "Binary Classification"
+author: "Mara Alexeev"
+date: "1/13/2022"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE, message = FALSE, warning = FALSE)
+
+library(tidyverse)
+library(magrittr)
+library(tidymodels)
+library(DT)
+library(textrecipes)
+library(discrim)
+library(naivebayes)
+```
+
+## Supervised Machine Learning for Text Analysis in R
+
+Check out this [awesome resource](https://smltar.com/) for text analysis in R. 
+
+
+## Data
+
+OUr data includes text from two different sources. Reviews of clothing and ED cheif complaints.
+
+```{r}
+data <- readr::read_csv("data/workshop_data.csv")
+
+data$category <- as_factor(data$category)
+```
+Below you can review a little of the data. The columns included in the data are: 
+
+- age: age of patient or reviewer
+
+- text: the clothing review or the ED chief complaint
+
+- category: negative means not a ED chief complaint and positive means it is an ED chief complaint
+
+- id: id number for each narrative
+
+```{r}
+data %>% head(10) %>% DT::datatable()
+```
+Here we will split our data into training and testing groups.
+```{r}
+set.seed(1111)
+
+data_split <- initial_split(data, strata = category)
+
+data_train <- training(data_split)
+data_test <- testing(data_split)
+```
+
+Here we build a "recipe" to say we want to predict `category` using the `text` and `age` columns from the training data, `data_train`. It is important to split data so that your NLP models never see your testing data until you are ready to test the performance of the model. Otherwise you will run into a very serious machine learning problem called data leakage.
+
+```{r}
+data_rec <- recipe(category ~ text, data = data_train)
+```
+
+
+```{r}
+data_rec <- data_rec %>%
+  step_tokenize(text) %>%
+  step_tokenfilter(text, max_tokens = 1e3) %>%
+  step_tfidf(text)
+```
+
+
+```{r}
+data_wf <- workflow() %>%
+  add_recipe(data_rec)
+```
+
+
+```{r}
+nb_spec <- naive_Bayes() %>%
+  set_mode("classification") %>%
+  set_engine("naivebayes")
+
+nb_spec
+```
+
+```{r}
+nb_fit <- data_wf %>%
+  add_model(nb_spec) %>%
+  fit(data = data_train)
+```
+
+```{r}
+set.seed(234)
+data_folds <- vfold_cv(data_train)
+
+data_folds
+```
+
+```{r}
+nb_wf <- workflow() %>%
+  add_recipe(data_rec) %>%
+  add_model(nb_spec)
+
+nb_wf
+```
+
+
+```{r}
+nb_rs <- fit_resamples(
+  nb_wf,
+  data_folds,
+  control = control_resamples(save_pred = TRUE)
+)
+```
+
+
+```{r}
+nb_rs_metrics <- collect_metrics(nb_rs)
+nb_rs_predictions <- collect_predictions(nb_rs)
+```
+
+```{r}
+nb_rs_metrics
+```
+
+
+
+```{r}
+set.seed(88)
+data_folds <- vfold_cv(data_train)
+
+data_folds
+```
+
+```{r}
+nb_wf <- workflow() %>%
+  add_recipe(data_rec) %>%
+  add_model(nb_spec)
+
+nb_wf
+```
+
+
+```{r}
+nb_rs <- fit_resamples(
+  nb_wf,
+  data_folds,
+  control = control_resamples(save_pred = TRUE)
+)
+```
+
+
+```{r}
+nb_rs_metrics <- collect_metrics(nb_rs)
+nb_rs_predictions <- collect_predictions(nb_rs)
+```
+
+```{r}
+nb_rs_metrics
+```
+
+```{r}
+nb_rs_predictions %>%
+  group_by(id) %>%
+  roc_curve(truth = category, .pred_class) %>%
+  autoplot() +
+  labs(
+    color = NULL,
+    title = "ROC curve for Determining Medical Text from Non-meidical",
+    subtitle = "Each resample fold is shown in a different color"
+  )
+```
+

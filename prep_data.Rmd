@@ -1,0 +1,82 @@
+---
+title: "NLP Playground"
+author: "Mara Alexeev"
+date: "1/12/2022"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+```{r}
+library(tidyverse)
+library(magrittr)
+library(janitor)
+```
+
+```{r}
+neiss_data <- neiss_nlp %>% 
+  select(age, sex, combined_narrative)
+```
+
+```{r}
+neiss_data %<>% 
+  mutate(category = "positive")
+```
+
+```{r}
+neiss_data %<>% filter(sex == 1 | sex == 2)
+```
+
+```{r}
+
+```
+
+
+```{r}
+neiss_data_workshop <- neiss_data %>% select(-sex) %>% slice_sample(n = 25000)
+```
+
+```{r}
+neiss_data_workshop %<>% 
+  rename(text = combined_narrative)
+```
+
+
+```{r}
+clothing_data <- full_clothing_data_do_not_modify %>% select(age, review_text)
+```
+
+
+```{r}
+clothing_data %<>% mutate(category = "negative")
+```
+
+```{r}
+clothing_data %<>% 
+  rename(text = review_text)
+```
+
+```{r}
+workshop_data <- bind_rows(clothing_data, neiss_data_workshop)
+```
+
+```{r}
+workshop_data %<>% slice_sample(replace = FALSE, prop = 1)
+```
+
+```{r}
+workshop_data$text <- str_to_sentence(workshop_data$text )
+```
+
+
+```{r}
+workshop_data %<>% mutate(id = row_number())
+```
+
+```{r}
+write_csv(workshop_data, "./data/workshop_data.csv")
+```
+
+
